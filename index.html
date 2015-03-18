@@ -1,0 +1,569 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>MP3 Player</title>
+
+
+<link href="styles.css" rel="stylesheet">
+<link href='http://fonts.googleapis.com/css?family=Lato' rel='stylesheet' type='text/css'>
+<script src='createjs-2013.12.12.min.js'></script>
+<script>
+
+
+
+var progress = 0;
+var total = 0;
+//Interface globals
+//Button Vars
+var playBTN, stopBTN, prevBTN, nextBTN, muteBTN, menubar, volHandleBTN, volBar, seekHandBTN, seekBar;
+
+
+var sound, analyser;
+
+
+//Booleans
+var isPlaying = false, isMuted= false, isDragging = false, isDropped = false, isDown = false;
+
+
+//Values
+var sndPosition = 0, volLevel = 0.75;
+
+var songList = [{id:'song1', src:'music/Diamonds.mp3', title: "Diamonds",  artist: "Ben Howard", album: "Every Kingdom", imageart: 'assets/everykingdom.png'},
+				{id:'song1', src:'music/IWillBeBlessed.mp3', title: "I Will Be Blessed", artist: "Ben Howard", album: "Every Kingdom", imageart: 'assets/everykingdom.png'  },
+				{id:'song1', src:'music/KeepYourHeadUp.mp3', title: "Keep Your Head Up", artist: "Ben Howard", album: "Every Kingdom", imageart: 'assets/everykingdom.png'  },
+				{id:'song1', src:'music/OldPine.mp3', title: "Old Pine", artist: "Ben Howard", album: "Every Kingdom", imageart: 'assets/everykingdom.png'  } ,
+				
+				{id:'song1', src:'music/BethRest.mp3', title: "Beth Rest", artist: "Bon Iver", album: "Bon Iver", imageart: 'assets/boniver.png'  }, 
+				
+				{id:'song1', src:'music/Lisbon.mp3', title: "Lisbon", artist: "Bon Iver", album: "Bon Iver", imageart: 'assets/boniver.png'  },
+				
+				{id:'song1', src:'music/MessisMine.mp3', title: "Mess is Mine", artist: "Vance Joy", album: "Dream Your Life Away", imageart: 'assets/dreamyourlifeaway.png'  }, 
+				
+					{id:'song1', src:'music/TenerifeSea.mp3', title: "Tenerife Sea", artist: "Ed Sheeran", album: "X", imageart: 'assets/x.png'  },
+					
+		{id:'song1', src:'music/ThinkingOutLoud.mp3', title: "Thinking Out Loud", artist: "Ed Sheeran", album: "X", imageart: 'assets/x.png'  }
+				
+				
+					];
+var songIndex = 0;
+
+
+
+function init(){
+	stage = new createjs.Stage('canvas');
+	queue = new createjs.LoadQueue(); //Start our loader 
+	
+	/////this is how to get the song title to show
+	
+	stage.enableMouseOver(10);
+	
+	queue.installPlugin(createjs.Sound); //Lets us use the SoundJS Library 
+	
+	pie = new createjs.Shape();
+	stage.addChild(pie);
+	
+	
+	queue.addEventListener("complete", handleComplete);
+	
+	
+	///load interface assets into queue
+	queue.loadManifest([
+		
+		{id:'playbtn', src:'imageBTN/playBTN.png'} , 
+		{id:'stopbtn', src:'imageBTN/stopBTN.png'} , 
+		{id:'prevbtn', src:'imageBTN/prevBTN.png'} , 
+		{id:'nextbtn', src:'imageBTN/nextBTN.png'} , 
+		{id:'pausebtn', src:'imageBTN/pauseBTN.png'}, 
+		{id:'muteoff', src:'assets/muteoff.png'}, 
+		{id:'muteon', src:'assets/muteon.png'},
+		{id:'menubar', src:'assets/menubar.png'},
+		{id:'dropmenu', src:'assets/dropmenu.png'},
+		{id:'volhandle', src:'assets/volhandle.png'}, 
+		{id:'volarea', src:'assets/volbar.png'}, 
+		{id: 'seekhandle', src:'imageBTN/seekhandle.png'}, 	
+		{id: 'seekarea', src:'imageBTN/seekbar.png'}, 
+		{id: 'menuicon', src: 'imageBTN/menuBTN.png'} 
+	]);
+	
+	// Load First Song 
+	
+	queue.loadFile(songList[songIndex]);
+		
+}
+
+function handleProgress(e){
+	
+	progress += Math.floor(e.loaded * 100) / 5;
+	total += e.total;
+	console.log(total);
+	
+	pie.graphics.beginFill('tan')
+		.arc(75,75,75,0, Math.PI * (e.loaded * 2), false)
+		.lineTo(75, 75)
+		.closePath()
+		.setStrokeStyle(8, "round")
+		.beginStroke('white');
+	
+		pie.x = 100; 
+		pie.y = 100;
+		
+	stage.update();
+	
+}
+
+
+function handleLoad(e){
+	
+	document.getElementById('display').innerHTML += "Loaded: " + e.item.src + "<br>"; 	
+	
+}
+//////////////////////////////
+/////
+///// ADDING ALL TO STAGE
+/////
+//////////////////////////////
+function handleComplete(e){
+	stage.removeChild(pie);
+	
+	queue.removeEventListener("complete",handleComplete);
+
+	dropMenu = new createjs.Bitmap(queue.getResult('dropmenu'));
+	dropMenu.x = 21; 
+	dropMenu.y = -150; 
+	stage.addChild(dropMenu);
+	
+	
+	seekBar = new createjs.Bitmap(queue.getResult('seekarea'));
+	seekBar.x = 250; 
+	seekBar.y = 200;
+	stage.addChild(seekBar);
+	seekBar.visible = false; 
+	
+	albumart = new createjs.Bitmap(songList[songIndex].imageart);
+	albumart.x = 70; 
+	albumart.y = 100;
+	stage.addChild(albumart);
+	albumart.visible = false; 
+	
+	seekHandBTN = new createjs.Bitmap(queue.getResult('seekhandle'));
+	seekHandBTN.x = 250; 
+	seekHandBTN.y = 195;
+	stage.addChild(seekHandBTN);
+	seekHandBTN.addEventListener('pressmove', onSeekDrag);
+	seekHandBTN.visible = false; 
+
+	menuBar = new createjs.Bitmap(queue.getResult('menubar'));
+	menuBar.x = 10;
+	menuBar.y = 0;
+	stage.addChild(menuBar);
+	
+	songname = new createjs.Text(songList[songIndex].title, '20px Lato', '#00000');
+	songname.x = 250; 
+	songname.y = 120; 
+	stage.addChild(songname);
+	songname.visible = false;
+	
+	songalbum = new createjs.Text(songList[songIndex].album, '15px Lato', '#00000');
+	songalbum.x = 250; 
+	songalbum.y = 145; 
+	stage.addChild(songalbum);
+	songalbum.visible = false;
+
+	songartist = new createjs.Text(songList[songIndex].artist, '15px Lato', '#00000');
+	songartist.x = 250; 
+	songartist.y = 160; 
+	stage.addChild(songartist);
+	songartist.visible = false;
+	
+	songtime = new createjs.Text('0:00 | 0:00', '10px Lato', '#00000')
+	songtime.x = 386; 
+	songtime.y = 199; 
+	stage.addChild(songtime); 
+	songtime.visible = false;
+	
+	playBTN = new createjs.Bitmap(queue.getResult('playbtn'));
+	playBTN.x = 80;
+	playBTN.y = 15;
+	stage.addChild(playBTN);
+	playBTN.addEventListener('click', handlePlayClick);
+	playBTN.addEventListener('mouseover', handlePlayOver);
+	playBTN.addEventListener('mouseout', handlePlayOut);
+	
+	stopBTN = new createjs.Bitmap(queue.getResult('stopbtn'));
+	stopBTN.x = 120;
+	stopBTN.y = 16;
+	stage.addChild(stopBTN);
+	stopBTN.addEventListener('click', handleStopClick);
+	stopBTN.addEventListener('mouseover', handleStopOver);
+	stopBTN.addEventListener('mouseout', handleStopOut);
+	
+	prevBTN = new createjs.Bitmap(queue.getResult('prevbtn'));
+	prevBTN.x = 30;
+	prevBTN.y = 18;
+	stage.addChild(prevBTN);
+	prevBTN.addEventListener('click', handlePrevClick);
+	prevBTN.addEventListener('mouseover', handlePrevOver);
+	prevBTN.addEventListener('mouseout', handlePrevOut);
+	
+	nextBTN = new createjs.Bitmap(queue.getResult('nextbtn'));
+	nextBTN.x = 160;
+	nextBTN.y = 18;
+	stage.addChild(nextBTN);
+	nextBTN.addEventListener('click', handleNextClick);
+	nextBTN.addEventListener('mouseover', handleNextOver);
+	nextBTN.addEventListener('mouseout', handleNextOut);
+	
+	volBar = new createjs.Bitmap(queue.getResult('volarea'));
+	volBar.x = 200;
+	volBar.y = 28;
+	stage.addChild(volBar);
+	
+	volHandleBTN = new createjs.Bitmap(queue.getResult('volhandle'));
+	volHandleBTN.x = 20 + (352 * volLevel);
+	volHandleBTN.y = 23;
+	stage.addChild(volHandleBTN);
+	volHandleBTN.addEventListener('pressmove', onVolumeDrag);
+	
+	muteBTN = new createjs.Bitmap(queue.getResult('muteon'));
+	muteBTN.x = 365;
+	muteBTN.y = 20;
+	stage.addChild(muteBTN);
+	muteBTN.addEventListener('click',onMuteClick);
+	muteBTN.addEventListener('mouseover', handleMuteOver);
+	muteBTN.addEventListener('mouseout', handleMuteOut);
+	
+	menuBTN = new createjs.Bitmap(queue.getResult('menuicon')); 
+	menuBTN.x = 400;
+	menuBTN.y = 20;
+	stage.addChild(menuBTN);
+	menuBTN.addEventListener('click', pressmenuBTNClick);
+	menuBTN.addEventListener('mouseover', handleMenuOver);
+	menuBTN.addEventListener('mouseout', handleMenuOut);
+
+	createjs.Ticker.setFPS(12);
+	createjs.Ticker.addEventListener('tick', tick);
+}
+
+
+//////////////////////////////
+/////
+///// VOL and SEEK DRAG  
+/////
+//////////////////////////////
+function onVolumeDrag(e){
+	e.target.x = e.stageX;
+	
+	
+	if(e.target.x >= 352){
+		e.target.x = 352;
+	}
+	
+	if(e.target.x <= 200){
+		e.target.x = 200;
+	}
+	
+	if(isMuted){
+		muteBTN.image = queue.getResult('muteon');
+		isMuted = false; 
+	}
+	volLevel = (Math.round(e.target.x - 200)) / 352;
+	if(isPlaying)sound.volume = volLevel;
+}
+
+
+function onSeekDrag (e){
+	e.target.x = e.stageX;
+	
+	if(e.target.x >= 377){
+		e.target.x = 377;
+	}
+	
+	if(e.target.x <= 250){
+		e.target.x = 250;
+	}
+
+	seekPos = (Math.round(e.target.x - 250)) / 125;
+	sound.setPosition(seekPos * sound.getDuration());	
+}
+
+//////////////////////////////
+/////
+///// DROP MENU 
+/////
+//////////////////////////////
+
+function pressmenuBTNClick(e){
+	if (isDropped){
+		
+		isDropped = false;
+		createjs.Tween.get(dropMenu).to({x:21, y:-150}, 250, createjs.Ease.easeInCirc);
+		songtime.visible = false;
+		seekBar.visible = false; 
+		seekHandBTN.visible = false; 
+		songname.visible = false; 
+		songartist.visible = false;
+		songalbum.visible = false;
+		albumart.visible = false;
+		
+		
+	///	stage.removeChild(albumart);
+		
+	} else{ 
+		isDropped = true;
+		createjs.Tween.get(dropMenu).to({x:21, y:50}, 250, createjs.Ease.easeInCirc).call(listappear);
+		
+		function listappear (){
+		seekBar.visible = true; 
+		seekHandBTN.visible = true; 
+		songname.visible = true; 
+		songtime.visible = true;
+		songartist.visible = true;
+		songalbum.visible = true;
+		albumart.visible = true; 
+	///	albumart = new createjs.Bitmap(songList[songIndex].imageart);
+	///	albumart.x = 70; 
+	///	albumart.y = 100;
+	///	stage.addChild(albumart);
+		
+		
+		}
+	}	
+}
+
+//////////////////////////////
+/////
+///// HOVER ANIMATIONS 
+/////
+//////////////////////////////
+
+
+
+
+function handlePlayOver(e){
+	createjs.Tween.get(playBTN).to({alpha: 0.5}, 15);
+}
+
+function handlePlayOut(e){
+	createjs.Tween.get(playBTN).to({alpha:1}, 15);
+}
+
+function handleStopOver(e){
+	createjs.Tween.get(stopBTN).to({alpha: 0.5}, 15);
+}
+
+function handleStopOut(e){
+	createjs.Tween.get(stopBTN).to({alpha:1}, 15);
+}
+
+function handlePrevOver (e){
+	createjs.Tween.get(prevBTN).to({alpha: 0.5}, 15);
+}
+
+function handlePrevOut (e){
+	createjs.Tween.get(prevBTN).to({alpha:1}, 15);	
+}
+
+function handleNextOver (e) {
+	createjs.Tween.get(nextBTN).to({alpha: 0.5}, 15);
+}
+
+function handleNextOut (e) {
+	createjs.Tween.get(nextBTN).to({alpha: 1}, 15);
+}
+
+function handleMenuOver (e){
+	createjs.Tween.get(menuBTN).to({alpha: 0.5}, 15);
+}
+
+function handleMenuOut (e) {
+	createjs.Tween.get(menuBTN).to({alpha: 1}, 15);
+}
+
+function handleMuteOver (e){
+	createjs.Tween.get(muteBTN).to({alpha: 0.5}, 15);
+}
+
+function handleMuteOut (e) {
+	createjs.Tween.get(muteBTN).to({alpha: 1}, 15);
+}
+
+
+//////////////////////////////
+/////
+///// BUTTON FUNCTIONS 
+/////
+//////////////////////////////
+
+function handlePrevClick(e){
+	sndPosition = 0; 
+	createjs.Sound.stop();
+	isPlaying = false; 
+	
+	if (songIndex > 0){
+		songIndex--;	
+	} else {
+		songIndex = songList.length - 1;	
+	}
+
+
+	if(isDropped){
+	queue.loadFile({id:'img', src:songList[songIndex].imageart})
+	}
+
+	queue.loadFile(songList[songIndex]);
+	queue.addEventListener ('complete', handleNextLoaded); 
+	
+	songname.text = songList[songIndex].title;
+	songalbum.text = songList[songIndex].album;
+	songartist.text = songList[songIndex].artist;
+	
+	
+	
+
+	
+}
+
+
+/// On Click start loading the next song
+function handleNextClick(e){
+	sndPosition = 0; 
+	createjs.Sound.stop();
+	isPlaying = false; 
+	
+	if (songIndex < songList.length - 1){
+		songIndex++;	
+		
+	} else {
+		songIndex = 0;
+			
+	}
+	if(isDropped){
+		queue.loadFile({id:'img', src:songList[songIndex].imageart})
+	} 
+	queue.loadFile(songList[songIndex]);
+	queue.addEventListener ('complete', handleNextLoaded); 
+	
+	songname.text = songList[songIndex].title;
+	songalbum.text = songList[songIndex].album;
+	songartist.text = songList[songIndex].artist;
+	
+
+	
+
+}
+
+/// This must run... AFTER we load the next song 
+function handleNextLoaded(e){
+	if(!isPlaying){
+		playBTN.image = queue.getResult('pausebtn');
+		isPlaying = true;
+	}
+	
+	sound = createjs.Sound.play(songList[songIndex].id);
+	albumart.image = queue.getResult('img');
+	
+
+}
+
+function handlePlayClick(e){
+	if(isPlaying){
+		sndPosition = sound.getPosition();
+		createjs.Sound.stop();
+		playBTN.image = queue.getResult('playbtn');
+		isPlaying = false;
+	} else {
+		sound = createjs.Sound.play(songList[songIndex].id);
+		sound.setPosition(sndPosition);
+	////////
+		
+	////	image = createjs.(songList[songIndex].image);
+		
+		analyser = sound._owner.context .createAnalyser(); // VIZ
+		sound.gainNode.connect(analyser); // VIZ
+		
+		sound.volume = volLevel;
+		playBTN.image = queue.getResult('pausebtn');
+		isPlaying = true;
+			if(isMuted){
+		muteBTN.image = queue.getResult('muteon');
+		isMuted = false; 
+			}
+		}
+	}
+
+function handleStopClick(e){
+	if(isPlaying){
+		sndPosition = 0;
+		createjs.Sound.stop();
+		playBTN.image = queue.getResult('playbtn');
+		isPlaying = false; 
+	}
+	
+stage.update();
+
+	}
+	
+function onMuteClick(e){
+	if(isMuted){
+		muteBTN.image = queue.getResult('muteon');
+		sound.volume = volLevel;
+		isMuted = false;
+	} else {
+		muteBTN.image = queue.getResult('muteoff');
+		sound.volume = 0;
+		isMuted = true;
+	}
+}
+
+
+function tick(){
+
+
+	
+	stage.update();
+	
+		if(isPlaying){
+			seconds = Math.floor(sound.getDuration() / 1000);
+			minutes = Math.floor(seconds / 60);
+			seconds = seconds % 60;
+			seconds = (seconds < 10) ? '0' + seconds : seconds; 
+			
+			pseconds = Math.floor(sound.getPosition() / 1000);
+			pminutes = Math.floor(pseconds / 60);
+			pseconds = pseconds % 60;
+			pseconds = (pseconds < 10) ? '0' + pseconds : pseconds;
+			
+			
+			songduration = pminutes + ':' + pseconds + ' | ' + minutes + ':' + seconds;
+			
+			songtime.text = songduration; 
+			
+	document.getElementById('display').innerHTML = pminutes + ':' + pseconds + ' | ' + minutes + ':' + seconds;
+		}
+		
+		
+		
+	if(!isDragging && isPlaying){
+		seekPos = sound.getPosition() / sound.getDuration();
+		seekHandBTN.x = (seekPos * 125) + 250; 
+		
+	}
+
+	
+}
+</script>
+</head>
+
+<body onLoad="init();">
+
+
+
+<canvas id="canvas" width="500" height="500">
+
+
+</canvas>
+	<div id="display"></div>
+
+</body>
+</html>
